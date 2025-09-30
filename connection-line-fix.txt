@@ -1,0 +1,48 @@
+// 新的連接線計算邏輯
+const connectionLine = computed(() => {
+  if (!boxA.value.visible || !boxB.value.visible) {
+    return null
+  }
+  
+  const centerA = {
+    x: boxA.value.x + boxA.value.width / 2,
+    y: boxA.value.y + boxA.value.height / 2
+  }
+  
+  const centerB = {
+    x: boxB.value.x + boxB.value.width / 2,
+    y: boxB.value.y + boxB.value.height / 2
+  }
+  
+  const deltaX = Math.abs(centerB.x - centerA.x)
+  const deltaY = Math.abs(centerB.y - centerA.y)
+  const isHorizontal = deltaX > deltaY
+  
+  if (isHorizontal) {
+    // 水平為主的連接線
+    const startX = centerA.x
+    const endX = centerB.x
+    const y = centerA.y
+    
+    return {
+      type: 'L-horizontal',
+      segments: [
+        { x1: startX, y1: y, x2: endX, y2: y }, // 水平線段
+        { x1: endX, y1: y, x2: endX, y2: centerB.y } // 垂直線段
+      ]
+    }
+  } else {
+    // 垂直為主的連接線
+    const startY = centerA.y
+    const endY = centerB.y
+    const x = centerA.x
+    
+    return {
+      type: 'Z-vertical',
+      segments: [
+        { x1: x, y1: startY, x2: x, y2: endY }, // 垂直線段
+        { x1: x, y1: endY, x2: centerB.x, y2: endY } // 水平線段
+      ]
+    }
+  }
+})

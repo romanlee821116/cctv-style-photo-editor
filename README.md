@@ -5,9 +5,9 @@ A photo editor with a sci-fi surveillance interface that allows you to upload ba
 ## Demo
 
 <div align="center">
-  <img src="/demo1.png" width="30%" alt="Demo 1" />
-  <img src="/demo2.png" width="30%" alt="Demo 2" />
-  <img src="/demo3.png" width="30%" alt="Demo 3" />
+  <img src="public/demo1.png" width="30%" alt="Demo 1" />
+  <img src="public/demo2.png" width="30%" alt="Demo 2" />
+  <img src="public/demo3.png" width="30%" alt="Demo 3" />
 </div>
 
 ## Features

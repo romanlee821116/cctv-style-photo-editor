@@ -1,65 +1,89 @@
 # CCTV Style Photo Editor
 
-一個具有監控風格介面的圖片編輯器，可以上傳底圖並產生多個可調整大小的檢測框，支援框框之間的連線功能。
+A photo editor with a sci-fi surveillance interface that allows you to upload base images and create multiple adjustable detection boxes with connection functionality. Features a black and white metallic design that simulates professional surveillance system visual effects.
 
-## 功能特色
+## Features
 
-- 🖼️ **圖片上傳**: 支援拖拽或點擊上傳底圖
-- 📦 **多個檢測框**: 點擊圖片任意位置產生檢測框
-- 🔧 **自由調整**: 框框可以自由拖拽和調整大小
-- 🔗 **框框連線**: 拖拽錨點連接不同框框
-- 🖼️ **框內圖片**: 每個框框可獨立上傳圖片
-- 🎨 **監控風格**: 賽博龐克風格的 UI 設計
-- 📱 **響應式**: 支援各種螢幕尺寸
+- 🖼️ **Image Upload**: Support drag & drop or click to upload base images
+- 📦 **Multiple Detection Boxes**: Click anywhere on the image to create detection boxes
+- 🔧 **Free Adjustment**: Boxes can be freely dragged and resized
+- 🔗 **Box Connections**: Drag anchor points to connect different boxes
+- 🖼️ **Box Images**: Each box can independently upload images
+- 🎨 **Sci-Fi Surveillance Style**: Black and white metallic theme with scan grids, edge rulers, and other surveillance elements
+- ⚙️ **Box Property Control**: Adjust box color, text content, and border width
+- 💾 **Image Save**: One-click save complete images with all elements
+- 📱 **Responsive**: Support for various screen sizes
 
-## 使用方法
+## Usage
 
-1. **上傳底圖**: 點擊上傳區域或直接拖拽圖片檔案
-2. **產生檢測框**: 點擊圖片上的任意位置產生檢測框
-3. **調整框框**: 
-   - 拖拽框框本體來移動位置
-   - 拖拽框框邊角來調整大小
-4. **框內圖片**: 滑鼠懸停在框框上，點擊 "+" 按鈕上傳圖片
-5. **框框連線**: 拖拽框框邊緣的錨點到另一個框框的錨點來建立連線
+1. **Upload Base Image**: Click the upload area or drag and drop image files
+2. **Create Detection Boxes**: Click anywhere on the image to create detection boxes
+3. **Adjust Boxes**: 
+   - Drag the box body to move position
+   - Drag box corners to resize
+4. **Box Settings**: Click on a box to open the control panel, where you can adjust:
+   - Color: Choose box border color
+   - Text: Add text content inside the box
+   - Border Width: Adjust border thickness (1-10px)
+5. **Box Images**: Hover over a box and click the "+" button to upload images
+6. **Box Connections**: Drag anchor points from box edges to another box's anchor points to create connections
+7. **Delete Boxes**: Hover over a box and click the delete button in the top-right corner
+8. **Save Image**: Click the "💾 SAVE" button to download the complete image with all elements
 
-## 功能演示
+## Visual Features
 
-- **檢測框創建**: 點擊圖片任意位置即可創建新的檢測框
-- **框框操作**: 支援拖拽移動、邊角縮放、錨點連線
-- **圖片上傳**: 每個框框可獨立上傳圖片內容
-- **連線系統**: 框框之間可建立視覺連線，支援動態更新
+- **Sci-Fi Surveillance Style**: Black and white metallic color scheme, simulating professional surveillance systems
+- **Scan Grid**: Pulsing grid effect covering the entire image area
+- **Edge Rulers**: Measurement rulers on left and right sides, enhancing the tech aesthetic
+- **Corner Markers**: L-shaped markers at four corners, simulating surveillance screen borders
+- **Control Panel**: Property setting panel that appears when clicking on boxes
+- **Animation Effects**: Grid pulse animation creating a surveillance system atmosphere
 
-## 技術棧
 
-- **Vue 3** - 現代化的前端框架
-- **TypeScript** - 型別安全的 JavaScript
-- **Vite** - 快速的建構工具
-- **CSS3** - 現代化的樣式設計
-
-## 專案設定
+## Project Setup
 
 ```bash
-# 安裝依賴
+# Install dependencies
 npm install
 
-# 啟動開發伺服器
+# Start development server
 npm run dev
 
-# 建構生產版本
+# Build for production
 npm run build
 
-# 預覽生產版本
+# Preview production build
 npm run preview
 ```
 
-## 授權
+## Project Structure
 
-此專案採用 MIT 授權條款。
+```
+src/
+├── App.vue              # Main application component
+├── components/
+│   └── ImageEditor.vue  # Image editor component (main functionality)
+├── assets/              # Static assets
+└── main.ts             # Application entry point
+```
 
-## 貢獻
+## Main Feature Modules
 
-歡迎提交 Issue 和 Pull Request！
+- **Image Upload Module**: Support drag & drop and click upload
+- **Detection Box Management**: Create, adjust, and delete detection boxes
+- **Property Control**: Color, text, and border width settings
+- **Connection System**: Visual connections between boxes
+- **Image Save**: Canvas rendering and image download
+- **Surveillance Style**: Sci-fi visual effects and animations
 
-## 作者
+## License
+
+This project is licensed under the MIT License.
+
+## Contributing
+
+Issues and Pull Requests are welcome!
+
+## Author
 
 Roman Lee - [GitHub](https://github.com/romanlee821116)

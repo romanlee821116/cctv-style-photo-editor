@@ -38,6 +38,7 @@ body {
 
 .app {
   min-height: 100vh;
+  width: 100%;
   background: linear-gradient(45deg, #1a1a1a 0%, #2a2a2a 100%);
 }
 

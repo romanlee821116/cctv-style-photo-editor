@@ -6,7 +6,7 @@
         <input
           ref="fileInput"
           type="file"
-          accept="image/*"
+          accept=".png,.jpg,.jpeg"
           @change="handleFileUpload"
           style="display: none"
         />
@@ -74,7 +74,7 @@
             <input
               :data-box-index="index"
               type="file"
-              accept="image/*"
+              accept=".png,.jpg,.jpeg"
               @change="handleBoxUpload($event, index)"
               style="display: none"
             />
@@ -109,7 +109,9 @@
             :y1="connection.y1"
             :x2="connection.x2"
             :y2="connection.y2"
-            class="connection-line"
+            :class="['connection-line', { 'selected': selectedConnectionIndex === index }]"
+            :stroke="connection.color || '#01FF06'"
+            @click.stop="selectConnection(index)"
           />
         </svg>
         
@@ -146,7 +148,7 @@
     <!-- 框框控制面板 -->
     <div v-if="showControlPanel && selectedBoxIndex >= 0" class="box-control-panel">
       <div class="panel-header">
-        <h3>BOX SETTING</h3>
+        <h3>STYLE SETTING</h3>
       </div>
       
       <div class="panel-content">
@@ -154,7 +156,7 @@
           <label>COLOR</label>
           <input 
             type="color" 
-            :value="boxes[selectedBoxIndex]?.color || '#c0c0c0'"
+            :value="boxes[selectedBoxIndex]?.color || '#01FF06'"
             @input="handleColorChange"
           />
         </div>
@@ -181,6 +183,25 @@
         </div>
       </div>
     </div>
+    
+    <!-- 連線控制面板 -->
+    <div v-if="showControlPanel && selectedConnectionIndex >= 0" class="connection-control-panel">
+      <div class="panel-header">
+        <h3>CONNECTION SETTING</h3>
+      </div>
+      
+      <div class="panel-content">
+        <div class="control-group">
+          <label>COLOR</label>
+          <input 
+            type="color" 
+            :value="connections[selectedConnectionIndex]?.color || '#01FF06'"
+            @input="handleConnectionColorChange"
+          />
+        </div>
+      </div>
+    </div>
+    
     <button @click="saveImage" class="save-btn">
       💾 SAVE
     </button>
@@ -211,6 +232,7 @@ interface Connection {
   fromSide: string
   toBox: number
   toSide: string
+  color: string
 }
 
 const fileInput = ref<HTMLInputElement>()
@@ -225,6 +247,7 @@ const isDragging = ref(false)
 const isDraggingAnchor = ref(false)
 const currentBoxIndex = ref(-1)
 const selectedBoxIndex = ref(-1)
+const selectedConnectionIndex = ref(-1)
 const showControlPanel = ref(false)
 const resizeStart = ref({ x: 0, y: 0, width: 0, height: 0 })
 const dragStart = ref({ x: 0, y: 0, boxX: 0, boxY: 0 })
@@ -238,15 +261,17 @@ const anchorDragStart = ref({
 })
 const dragLine = ref({ x1: 0, y1: 0, x2: 0, y2: 0 })
 
-const getBoxStyle = (box: Box) => ({
-  left: `${box.x}px`,
-  top: `${box.y}px`,
-  width: `${box.width}px`,
-  height: `${box.height}px`,
-  borderColor: box.color,
-  borderWidth: `${box.borderSize}px`,
-  color: box.color
-})
+const getBoxStyle = (box: Box) => {
+  return {
+    left: `${box.x}px`,
+    top: `${box.y}px`,
+    width: `${box.width}px`,
+    height: `${box.height}px`,
+    borderColor: box.color,
+    borderWidth: `${box.borderSize}px`,
+    color: box.color
+  }
+}
 
 const triggerFileUpload = () => {
   fileInput.value?.click()
@@ -257,9 +282,22 @@ const triggerBoxUpload = (index: number) => {
   input?.click()
 }
 
+// 檔案格式驗證函數
+const validateImageFile = (file: File): boolean => {
+  const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg']
+  const fileExtension = file.name.toLowerCase().split('.').pop()
+  const allowedExtensions = ['png', 'jpg', 'jpeg']
+  
+  if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension || '')) {
+    alert('請上傳 PNG、JPG 或 JPEG 格式的圖片')
+    return false
+  }
+  return true
+}
+
 const handleFileUpload = (event: Event) => {
   const file = (event.target as HTMLInputElement).files?.[0]
-  if (file) {
+  if (file && validateImageFile(file)) {
     const reader = new FileReader()
     reader.onload = (e) => {
       baseImage.value = e.target?.result as string
@@ -271,7 +309,7 @@ const handleFileUpload = (event: Event) => {
 const handleDrop = (event: DragEvent) => {
   event.preventDefault()
   const file = event.dataTransfer?.files[0]
-  if (file && file.type.startsWith('image/')) {
+  if (file && validateImageFile(file)) {
     const reader = new FileReader()
     reader.onload = (e) => {
       baseImage.value = e.target?.result as string
@@ -282,7 +320,7 @@ const handleDrop = (event: DragEvent) => {
 
 const handleBoxUpload = (event: Event, index: number) => {
   const file = (event.target as HTMLInputElement).files?.[0]
-  if (file && boxes.value[index]) {
+  if (file && boxes.value[index] && validateImageFile(file)) {
     const reader = new FileReader()
     reader.onload = (e) => {
       if (boxes.value[index]) {
@@ -300,9 +338,27 @@ const handleImageClick = (event: MouseEvent) => {
   const x = event.clientX - rect.left
   const y = event.clientY - rect.top
   
+  // 調試信息
+  console.log('Image dimensions:', {
+    naturalWidth: baseImageRef.value.naturalWidth,
+    naturalHeight: baseImageRef.value.naturalHeight,
+    offsetWidth: baseImageRef.value.offsetWidth,
+    offsetHeight: baseImageRef.value.offsetHeight,
+    clientWidth: baseImageRef.value.clientWidth,
+    clientHeight: baseImageRef.value.clientHeight,
+    rect: rect
+  })
+  
   // 檢查是否點擊在現有框框內
   for (const box of boxes.value) {
     if (isPointInBox(x, y, box)) {
+      return
+    }
+  }
+  
+  // 檢查是否點擊在連線上
+  for (const connection of connections.value) {
+    if (isPointOnLine(x, y, connection)) {
       return
     }
   }
@@ -315,6 +371,43 @@ const isPointInBox = (x: number, y: number, box: Box) => {
   return x >= box.x && x <= box.x + box.width && y >= box.y && y <= box.y + box.height
 }
 
+const isPointOnLine = (x: number, y: number, connection: Connection) => {
+  const { x1, y1, x2, y2 } = connection
+  const tolerance = 8 // 點擊容差範圍
+  
+  // 計算點到線段的最短距離
+  const A = x - x1
+  const B = y - y1
+  const C = x2 - x1
+  const D = y2 - y1
+  
+  const dot = A * C + B * D
+  const lenSq = C * C + D * D
+  
+  if (lenSq === 0) return false
+  
+  const param = dot / lenSq
+  
+  let xx, yy
+  
+  if (param < 0) {
+    xx = x1
+    yy = y1
+  } else if (param > 1) {
+    xx = x2
+    yy = y2
+  } else {
+    xx = x1 + param * C
+    yy = y1 + param * D
+  }
+  
+  const dx = x - xx
+  const dy = y - yy
+  const distance = Math.sqrt(dx * dx + dy * dy)
+  
+  return distance <= tolerance
+}
+
 const addBoxAt = (x: number, y: number) => {
   const newBox: Box = {
     id: `box-${Date.now()}`,
@@ -322,7 +415,7 @@ const addBoxAt = (x: number, y: number) => {
     y: y - 50,
     width: 100,
     height: 100,
-    color: '#c0c0c0',
+    color: '#01FF06',
     text: '',
     borderSize: 2
   }
@@ -363,6 +456,13 @@ const deleteBox = (index: number) => {
 
 const selectBox = (index: number) => {
   selectedBoxIndex.value = index
+  selectedConnectionIndex.value = -1
+  showControlPanel.value = true
+}
+
+const selectConnection = (index: number) => {
+  selectedConnectionIndex.value = index
+  selectedBoxIndex.value = -1
   showControlPanel.value = true
 }
 
@@ -371,6 +471,15 @@ const updateBoxProperty = (property: keyof Box, value: any) => {
     const box = boxes.value[selectedBoxIndex.value]
     if (box) {
       (box as any)[property] = value
+    }
+  }
+}
+
+const updateConnectionProperty = (property: keyof Connection, value: any) => {
+  if (selectedConnectionIndex.value >= 0 && selectedConnectionIndex.value < connections.value.length) {
+    const connection = connections.value[selectedConnectionIndex.value]
+    if (connection) {
+      (connection as any)[property] = value
     }
   }
 }
@@ -388,6 +497,11 @@ const handleTextChange = (event: Event) => {
 const handleBorderSizeChange = (event: Event) => {
   const target = event.target as HTMLInputElement
   updateBoxProperty('borderSize', parseInt(target.value))
+}
+
+const handleConnectionColorChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  updateConnectionProperty('color', target.value)
 }
 
 const saveImage = async () => {
@@ -415,45 +529,86 @@ const saveImage = async () => {
     const scaleY = img.naturalHeight / img.offsetHeight
 
     // 繪製框框
-    boxes.value.forEach(box => {
-      const x = box.x * scaleX
-      const y = box.y * scaleY
-      const width = box.width * scaleX
-      const height = box.height * scaleY
+    const drawBoxes = async () => {
+      for (const box of boxes.value) {
+        const x = box.x * scaleX
+        const y = box.y * scaleY
+        const width = box.width * scaleX
+        const height = box.height * scaleY
 
-      // 繪製框框邊框
-      ctx.strokeStyle = box.color
-      ctx.lineWidth = box.borderSize * scaleX
-      ctx.strokeRect(x, y, width, height)
+        // 繪製框框邊框
+        ctx.strokeStyle = box.color
+        ctx.lineWidth = box.borderSize * scaleX
+        ctx.strokeRect(x, y, width, height)
 
-      // 繪製框框文字
-      if (box.text) {
-        ctx.fillStyle = box.color
-        ctx.font = `${12 * scaleX}px monospace`
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-        ctx.fillText(box.text, x + width / 2, y + height / 2)
-      }
-
-      // 繪製框框圖片
-      if (box.image) {
-        const boxImg = new Image()
-        boxImg.onload = () => {
-          ctx.drawImage(boxImg, x, y, width, height)
+        // 繪製框框文字
+        if (box.text) {
+          // 設定文字樣式
+          ctx.font = `bold ${12 * scaleX}px monospace`
+          ctx.textAlign = 'left'
+          ctx.textBaseline = 'top'
+          
+          // 測量文字寬度
+          const textWidth = ctx.measureText(box.text).width
+          const textHeight = 12 * scaleX
+          const padding = 2 * scaleX
+          
+          // 文字位置（框框左上角）
+          const textX = x
+          const textY = y
+          
+          // 繪製文字背景
+          ctx.fillStyle = box.color
+          ctx.fillRect(
+            textX,
+            textY,
+            textWidth + padding * 2,
+            textHeight + padding * 2
+          )
+          
+          // 繪製文字陰影
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
+          ctx.fillText(box.text, textX + padding + 1, textY + padding + 1)
+          ctx.fillText(box.text, textX + padding - 1, textY + padding - 1)
+          ctx.fillText(box.text, textX + padding + 1, textY + padding - 1)
+          ctx.fillText(box.text, textX + padding - 1, textY + padding + 1)
+          
+          // 繪製文字
+          ctx.fillStyle = 'white'
+          ctx.fillText(box.text, textX + padding, textY + padding)
         }
-        boxImg.src = box.image
+
+        // 繪製框框圖片
+        if (box.image) {
+          await new Promise((resolve) => {
+            const boxImg = new Image()
+            boxImg.onload = () => {
+              ctx.drawImage(boxImg, x, y, width, height)
+              resolve(true)
+            }
+            boxImg.onerror = () => {
+              resolve(true) // 即使載入失敗也繼續
+            }
+            boxImg.src = box.image
+          })
+        }
       }
-    })
+    }
+
+    await drawBoxes()
 
     // 繪製連線
     connections.value.forEach(connection => {
-      ctx.strokeStyle = '#c0c0c0'
+      ctx.strokeStyle = connection.color || '#01FF06'
       ctx.lineWidth = 2 * scaleX
       ctx.beginPath()
       ctx.moveTo(connection.x1 * scaleX, connection.y1 * scaleY)
       ctx.lineTo(connection.x2 * scaleX, connection.y2 * scaleY)
       ctx.stroke()
     })
+
+    // 等待一小段時間確保所有繪製完成
+    await new Promise(resolve => setTimeout(resolve, 100))
 
     // 轉換為圖片並下載
     canvas.toBlob((blob) => {
@@ -664,7 +819,8 @@ const handleMouseUp = (event: MouseEvent) => {
           fromBox: anchorDragStart.value.boxIndex,
           fromSide: anchorDragStart.value.side,
           toBox: closest.boxIndex,
-          toSide: closest.side
+          toSide: closest.side,
+          color: '#01FF06'
         }
         
         connections.value.push(connection)
@@ -759,7 +915,14 @@ onUnmounted(() => {
   position: absolute;
   top: 10px;
   right: 10px;
-  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;  
+}
+
+.remove-base-image-btn:hover {
+  background-color: rgba(0, 0, 0, 0.8);
 }
 
 .box-delete-btn {
@@ -787,7 +950,7 @@ onUnmounted(() => {
 }
 
 .box-delete-btn:hover {
-  background: #ff6666;
+  background: #000;
   transform: scale(1.1);
 }
 
@@ -797,13 +960,17 @@ onUnmounted(() => {
   left: 0;
   font-size: 12px;
   color: white;
+  padding: 0 2px;
+  font-weight: bold;
+  text-shadow: 0 0 2px #000;
   text-align: center;
   pointer-events: none;
   max-width: calc(100% - 10px);
   word-wrap: break-word;
 }
 
-.box-control-panel {
+.box-control-panel,
+.connection-control-panel {
   position: fixed;
   top: 20px;
   right: 20px;
@@ -1080,15 +1247,15 @@ onUnmounted(() => {
   left: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none;
+  pointer-events: auto;
   z-index: 1;
 }
 
 .connection-line {
-  stroke: #c0c0c0;
   stroke-width: 2;
   fill: none;
   stroke-dasharray: none;
+  cursor: pointer;
 }
 
 .connection-line.dragging {
@@ -1096,6 +1263,11 @@ onUnmounted(() => {
   stroke-width: 2;
   stroke-dasharray: 5,5;
   animation: dash 1s linear infinite;
+}
+
+.connection-line.selected {
+  stroke-width: 4;
+  filter: drop-shadow(0 0 3px currentColor);
 }
 
 @keyframes dash {

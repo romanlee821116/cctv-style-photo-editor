@@ -11,9 +11,9 @@
           style="display: none"
         />
         <div class="upload-placeholder">
-          <div class="upload-icon">📷</div>
-          <p>點擊或拖拽上傳底圖</p>
-          <p class="upload-hint">支援 JPG, PNG, GIF 格式</p>
+          <div class="upload-icon">
+            <img src="/add.png" alt="Upload" />
+          </div>
         </div>
       </div>
       <div v-else class="image-container">
@@ -24,16 +24,18 @@
           @click="handleImageClick"
           class="base-image"
         />
-        
-        
+        <div v-if="baseImage" class="remove-base-image-btn" @click="clearBaseImage">
+          <img src="/cross.png" alt="Close" />
+        </div>
+
         <!-- 多個框框 -->
         <div
           v-for="(box, index) in boxes"
           :key="box.id"
           :style="getBoxStyle(box)"
-          class="detection-box"
+          :class="['detection-box', { 'selected': selectedBoxIndex === index }]"
           @mousedown="startDrag($event, index)"
-          @click.stop
+          @click.stop="selectBox(index)"
         >
           <div class="resize-handles">
             <div class="resize-handle nw" @mousedown.stop="startResize($event, index)"></div>
@@ -62,10 +64,15 @@
             ></div>
           </div>
           
+          <!-- 刪除按鈕 -->
+          <div class="box-delete-btn" @click.stop="deleteBox(index)">
+            <img src="/cross.png" alt="Delete" />
+          </div>
+          
           <!-- 框框圖片上傳 - 只在 hover 時顯示 -->
           <div class="box-image-upload" v-if="!box.image" @click.stop>
             <input
-              :ref="`boxFileInput${index}`"
+              :data-box-index="index"
               type="file"
               accept="image/*"
               @change="handleBoxUpload($event, index)"
@@ -76,7 +83,22 @@
             </button>
           </div>
           <img v-if="box.image" :src="box.image" alt="Box Image" class="box-image" @click.stop />
+          
+          <!-- 框框文字 -->
+          <div
+            v-if="box.text"
+            class="box-text"
+            :style="{ backgroundColor: box.color }"
+          >
+            {{ box.text }}
+          </div>
         </div>
+        
+        <!-- 掃描網格 -->
+        <div class="scan-grid" v-if="baseImage"></div>
+        
+        <!-- 掃描線 -->
+        <div class="scan-line" v-if="baseImage"></div>
         
         <!-- 連線 -->
         <svg class="connection-lines" v-if="connections.length > 0">
@@ -100,24 +122,68 @@
             :y2="dragLine.y2"
             class="connection-line dragging"
           />
-        </svg>
-      </div>
-    </div>
-    
-    <!-- 控制面板 -->
-    <div class="control-panel" v-if="baseImage">
-      <div class="panel-section">
-        <h3>底圖控制</h3>
-        <div class="button-group">
-          <button @click="triggerFileUpload" class="control-btn primary">
-            📷 改變底圖
-          </button>
-          <button @click="clearBaseImage" class="control-btn danger">
-            🗑️ 移除底圖
-          </button>
+        </svg>        
+        <!-- 邊緣標尺 -->
+        <div class="edge-rulers">
+          <div class="ruler-left">
+            <div class="ruler-mark" v-for="i in 10" :key="i" :style="{ top: `${i * 10}%` }"></div>
+          </div>
+          <div class="ruler-right">
+            <div class="ruler-mark" v-for="i in 10" :key="i" :style="{ top: `${i * 10}%` }"></div>
+          </div>
+        </div>
+        
+        <!-- 角落標記 -->
+        <div class="corner-markers">
+          <div class="corner-marker top-left"></div>
+          <div class="corner-marker top-right"></div>
+          <div class="corner-marker bottom-left"></div>
+          <div class="corner-marker bottom-right"></div>
         </div>
       </div>
     </div>
+    
+    <!-- 框框控制面板 -->
+    <div v-if="showControlPanel && selectedBoxIndex >= 0" class="box-control-panel">
+      <div class="panel-header">
+        <h3>BOX SETTING</h3>
+      </div>
+      
+      <div class="panel-content">
+        <div class="control-group">
+          <label>COLOR</label>
+          <input 
+            type="color" 
+            :value="boxes[selectedBoxIndex]?.color || '#c0c0c0'"
+            @input="handleColorChange"
+          />
+        </div>
+        
+        <div class="control-group">
+          <label>TEXT</label>
+          <input 
+            type="text" 
+            :value="boxes[selectedBoxIndex]?.text || ''"
+            @input="handleTextChange"
+            placeholder="ENTER BOX TEXT..."
+          />
+        </div>
+        
+        <div class="control-group">
+          <label>BORDER WIDTH: {{ boxes[selectedBoxIndex]?.borderSize || 2 }}px</label>
+          <input 
+            type="range" 
+            min="1" 
+            max="10" 
+            :value="boxes[selectedBoxIndex]?.borderSize || 2"
+            @input="handleBorderSizeChange"
+          />
+        </div>
+      </div>
+    </div>
+    <button @click="saveImage" class="save-btn">
+      💾 SAVE
+    </button>
   </div>
 </template>
 
@@ -131,6 +197,9 @@ interface Box {
   width: number
   height: number
   image?: string
+  color: string
+  text: string
+  borderSize: number
 }
 
 interface Connection {
@@ -155,6 +224,8 @@ const isResizing = ref(false)
 const isDragging = ref(false)
 const isDraggingAnchor = ref(false)
 const currentBoxIndex = ref(-1)
+const selectedBoxIndex = ref(-1)
+const showControlPanel = ref(false)
 const resizeStart = ref({ x: 0, y: 0, width: 0, height: 0 })
 const dragStart = ref({ x: 0, y: 0, boxX: 0, boxY: 0 })
 
@@ -171,29 +242,18 @@ const getBoxStyle = (box: Box) => ({
   left: `${box.x}px`,
   top: `${box.y}px`,
   width: `${box.width}px`,
-  height: `${box.height}px`
+  height: `${box.height}px`,
+  borderColor: box.color,
+  borderWidth: `${box.borderSize}px`,
+  color: box.color
 })
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const triggerFileUpload = () => {
   fileInput.value?.click()
 }
 
 const triggerBoxUpload = (index: number) => {
-  const input = document.querySelector(`input[ref="boxFileInput${index}"]`) as HTMLInputElement
+  const input = document.querySelector(`input[data-box-index="${index}"]`) as HTMLInputElement
   input?.click()
 }
 
@@ -261,7 +321,10 @@ const addBoxAt = (x: number, y: number) => {
     x: x - 50,
     y: y - 50,
     width: 100,
-    height: 100
+    height: 100,
+    color: '#c0c0c0',
+    text: '',
+    borderSize: 2
   }
   boxes.value.push(newBox)
 }
@@ -269,6 +332,146 @@ const addBoxAt = (x: number, y: number) => {
 const clearAllBoxes = () => {
   boxes.value = []
   connections.value = []
+}
+
+const deleteBox = (index: number) => {
+  if (index >= 0 && index < boxes.value.length) {
+    // 刪除與該框框相關的所有連接線
+    connections.value = connections.value.filter(connection => 
+      connection.fromBox !== index && connection.toBox !== index
+    )
+
+    connections.value.forEach(connection => {
+      if (connection.fromBox > index) {
+        connection.fromBox--
+      }
+      if (connection.toBox > index) {
+        connection.toBox--
+      }
+    })
+
+    // 刪除框框
+    boxes.value.splice(index, 1)
+
+    // 如果刪除的是當前選中的框框，關閉控制面板
+    if (selectedBoxIndex.value === index) {
+      selectedBoxIndex.value = -1
+      showControlPanel.value = false
+    }
+  }
+}
+
+const selectBox = (index: number) => {
+  selectedBoxIndex.value = index
+  showControlPanel.value = true
+}
+
+const updateBoxProperty = (property: keyof Box, value: any) => {
+  if (selectedBoxIndex.value >= 0 && selectedBoxIndex.value < boxes.value.length) {
+    const box = boxes.value[selectedBoxIndex.value]
+    if (box) {
+      (box as any)[property] = value
+    }
+  }
+}
+
+const handleColorChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  updateBoxProperty('color', target.value)
+}
+
+const handleTextChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  updateBoxProperty('text', target.value)
+}
+
+const handleBorderSizeChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  updateBoxProperty('borderSize', parseInt(target.value))
+}
+
+const saveImage = async () => {
+  if (!baseImageRef.value) {
+    alert('PLEASE UPLOAD IMG FIRST')
+    return
+  }
+
+  try {
+    // 創建一個 canvas 元素
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    // 設置 canvas 尺寸與圖片相同
+    const img = baseImageRef.value
+    canvas.width = img.naturalWidth
+    canvas.height = img.naturalHeight
+
+    // 繪製底圖
+    ctx.drawImage(img, 0, 0)
+
+    // 計算縮放比例
+    const scaleX = img.naturalWidth / img.offsetWidth
+    const scaleY = img.naturalHeight / img.offsetHeight
+
+    // 繪製框框
+    boxes.value.forEach(box => {
+      const x = box.x * scaleX
+      const y = box.y * scaleY
+      const width = box.width * scaleX
+      const height = box.height * scaleY
+
+      // 繪製框框邊框
+      ctx.strokeStyle = box.color
+      ctx.lineWidth = box.borderSize * scaleX
+      ctx.strokeRect(x, y, width, height)
+
+      // 繪製框框文字
+      if (box.text) {
+        ctx.fillStyle = box.color
+        ctx.font = `${12 * scaleX}px monospace`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(box.text, x + width / 2, y + height / 2)
+      }
+
+      // 繪製框框圖片
+      if (box.image) {
+        const boxImg = new Image()
+        boxImg.onload = () => {
+          ctx.drawImage(boxImg, x, y, width, height)
+        }
+        boxImg.src = box.image
+      }
+    })
+
+    // 繪製連線
+    connections.value.forEach(connection => {
+      ctx.strokeStyle = '#c0c0c0'
+      ctx.lineWidth = 2 * scaleX
+      ctx.beginPath()
+      ctx.moveTo(connection.x1 * scaleX, connection.y1 * scaleY)
+      ctx.lineTo(connection.x2 * scaleX, connection.y2 * scaleY)
+      ctx.stroke()
+    })
+
+    // 轉換為圖片並下載
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `cctv-editor-${Date.now()}.png`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      }
+    }, 'image/png')
+  } catch (error) {
+    console.error('SAVE IMG FAILED:', error)
+    alert('SAVE IMG FAILED, PLEASE TRY AGAIN')
+  }
 }
 
 // 錨點拖拽功能
@@ -499,11 +702,11 @@ onUnmounted(() => {
 }
 
 .upload-area {
-  border: 2px dashed #00ff00;
+  border: 2px dashed #c0c0c0;
   border-radius: 8px;
   padding: 2rem;
   text-align: center;
-  background: rgba(0, 255, 0, 0.05);
+  background: rgba(192, 192, 192, 0.05);
   cursor: pointer;
   transition: all 0.3s ease;
   min-height: 400px;
@@ -513,18 +716,23 @@ onUnmounted(() => {
 }
 
 .upload-area:hover {
-  border-color: #00ff88;
-  background: rgba(0, 255, 0, 0.1);
+  border-color: #e0e0e0;
+  background: rgba(192, 192, 192, 0.1);
 }
 
 .upload-placeholder {
-  color: #00ff00;
+  color: #c0c0c0;
 }
 
 .upload-icon {
-  font-size: 4rem;
-  margin-bottom: 1rem;
   opacity: 0.7;
+  width: 60px;
+  height: 60px;
+  background-color: rgba(0, 0, 0, .3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
 }
 
 .upload-hint {
@@ -544,11 +752,202 @@ onUnmounted(() => {
   max-height: 70vh;
   border-radius: 4px;
   cursor: crosshair;
+  position: relative;
+}
+
+.remove-base-image-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  cursor: pointer;
+}
+
+.box-delete-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.box-delete-btn img {
+  width: 12px;
+  height: 12px;
+  filter: brightness(0) invert(1);
+}
+
+.detection-box:hover .box-delete-btn {
+  opacity: 1;
+}
+
+.box-delete-btn:hover {
+  background: #ff6666;
+  transform: scale(1.1);
+}
+
+.box-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-size: 12px;
+  color: white;
+  text-align: center;
+  pointer-events: none;
+  max-width: calc(100% - 10px);
+  word-wrap: break-word;
+}
+
+.box-control-panel {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 300px;
+  background: rgba(0, 0, 0, 0.9);
+  border: 2px solid #c0c0c0;
+  border-radius: 8px;
+  padding: 0;
+  z-index: 1000;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  border-bottom: 1px solid #c0c0c0;
+  background: rgba(192, 192, 192, 0.1);
+}
+
+.panel-header h3 {
+  color: #c0c0c0;
+  margin: 0;
+  font-size: 16px;
+}
+
+.close-panel-btn {
+  background: transparent;
+  border: 1px solid #c0c0c0;
+  color: #c0c0c0;
+  width: 4px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-panel-btn:hover {
+  background: #c0c0c0;
+  color: #000;
+}
+
+.panel-content {
+  padding: 15px;
+}
+
+.control-group {
+  margin-bottom: 15px;
+}
+
+.control-group:last-child {
+  margin-bottom: 0;
+}
+
+.control-group label {
+  display: block;
+  color: #c0c0c0;
+  margin-bottom: 5px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.control-group input[type="color"] {
+  width: 100%;
+  height: 40px;
+  border: 1px solid #c0c0c0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.control-group input[type="text"] {
+  width: 100%;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid #c0c0c0;
+  color: #c0c0c0;
+  border-radius: 4px;
+  font-family: inherit;
+}
+
+.control-group input[type="text"]:focus {
+  outline: none;
+  box-shadow: 0 0 5px #c0c0c0;
+}
+
+.control-group input[type="range"] {
+  width: 100%;
+  height: 5px;
+  background: rgba(192, 192, 192, 0.2);
+  outline: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.control-group input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  background: #c0c0c0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.control-group input[type="range"]::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  background: #c0c0c0;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.save-btn {
+  width: fit-content;
+  padding: 12px;
+  background: linear-gradient(45deg, #c0c0c0, #e0e0e0);
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.save-btn:hover {
+  background: linear-gradient(45deg, #e0e0e0, #c0c0c0);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(192, 192, 192, 0.4);
+}
+
+.save-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(192, 192, 192, 0.3);
 }
 
 .detection-box {
   position: absolute;
-  border: 2px solid #00ff00;
+  border: 2px solid #c0c0c0;
   border-radius: 4px;
   cursor: move;
   user-select: none;
@@ -561,27 +960,7 @@ onUnmounted(() => {
 
 .detection-box:hover {
   background: rgba(0, 0, 0, 0.5);
-  box-shadow: 0 0 10px #00ff00;
-}
-
-.box-label {
-  position: absolute;
-  top: -25px;
-  left: 0;
-  background: currentColor;
-  color: #000;
-  padding: 2px 8px;
-  font-weight: bold;
-  font-size: 12px;
-  border-radius: 2px;
-}
-
-.box-a .box-label {
-  background: #00ff00;
-}
-
-.box-b .box-label {
-  background: #0088ff;
+  box-shadow: 0 0 10px #c0c0c0;
 }
 
 .resize-handles {
@@ -655,7 +1034,7 @@ onUnmounted(() => {
   position: absolute;
   width: 12px;
   height: 12px;
-  background: #00ff00;
+  background: #c0c0c0;
   border: 2px solid #000;
   border-radius: 50%;
   cursor: pointer;
@@ -667,7 +1046,7 @@ onUnmounted(() => {
 .anchor-point:hover {
   background: #fff;
   transform: scale(1.2);
-  box-shadow: 0 0 8px #00ff00;
+  box-shadow: 0 0 8px #c0c0c0;
 }
 
 .anchor-point.top {
@@ -706,14 +1085,14 @@ onUnmounted(() => {
 }
 
 .connection-line {
-  stroke: #00ff00;
+  stroke: #c0c0c0;
   stroke-width: 2;
   fill: none;
   stroke-dasharray: none;
 }
 
 .connection-line.dragging {
-  stroke: #00ff00;
+  stroke: #c0c0c0;
   stroke-width: 2;
   stroke-dasharray: 5,5;
   animation: dash 1s linear infinite;
@@ -727,8 +1106,7 @@ onUnmounted(() => {
 
 .upload-btn {
   background: rgba(0, 0, 0, 0.8);
-  color: #00ff00;
-  border: 1px solid #00ff00;
+  color: #c0c0c0;
   padding: 8px;
   border-radius: 50%;
   cursor: pointer;
@@ -744,10 +1122,10 @@ onUnmounted(() => {
 }
 
 .upload-btn:hover {
-  background: #00ff00;
+  background: #c0c0c0;
   color: #000;
   transform: scale(1.1);
-  box-shadow: 0 0 10px #00ff00;
+  box-shadow: 0 0 10px #c0c0c0;
 }
 
 .box-image {
@@ -757,108 +1135,197 @@ onUnmounted(() => {
   border-radius: 2px;
 }
 
-.control-panel {
+
+
+
+
+/* 科幻監控風格效果 */
+.scan-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    linear-gradient(rgba(192, 192, 192, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(192, 192, 192, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+  pointer-events: none;
+  z-index: 1;
+  animation: gridPulse 3s ease-in-out infinite;
+}
+
+.scan-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #c0c0c0, transparent);
+  pointer-events: none;
+  z-index: 3;
+  box-shadow: 0 0 10px #c0c0c0;
+}
+
+.scan-status-panel {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   background: rgba(0, 0, 0, 0.8);
-  border: 1px solid #00ff00;
-  border-radius: 8px;
-  padding: 1.5rem;
-  margin-top: 2rem;
-}
-
-.panel-section {
-  margin-bottom: 1.5rem;
-}
-
-.panel-section:last-child {
-  margin-bottom: 0;
-}
-
-.panel-section h3 {
-  color: #00ff00;
-  margin-bottom: 1rem;
-  font-size: 1.2rem;
-  text-shadow: 0 0 5px #00ff00;
-}
-
-.button-group {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.control-btn {
-  background: transparent;
-  color: #00ff00;
-  border: 1px solid #00ff00;
+  border: 1px solid #c0c0c0;
   padding: 10px 20px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 14px;
-  transition: all 0.3s ease;
-}
-
-.control-btn:hover:not(:disabled) {
-  background: #00ff00;
-  color: #000;
-}
-
-.control-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.control-btn.danger {
-  border-color: #ff4444;
-  color: #ff4444;
-}
-
-.control-btn.danger:hover:not(:disabled) {
-  background: #ff4444;
-  color: #000;
-}
-
-.control-btn.primary {
-  border-color: #0088ff;
-  color: #0088ff;
-}
-
-.control-btn.primary:hover:not(:disabled) {
-  background: #0088ff;
-  color: #000;
-}
-
-.box-info {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 0.5rem;
-}
-
-.info-item {
   display: flex;
-  justify-content: space-between;
-  padding: 0.5rem;
-  background: rgba(0, 255, 0, 0.05);
-  border-radius: 4px;
+  align-items: center;
+  gap: 15px;
+  z-index: 10;
+  font-family: 'Courier New', monospace;
 }
 
-.label {
+.scan-text {
+  color: #c0c0c0;
+  font-size: 12px;
   font-weight: bold;
-  color: #00ff88;
+  letter-spacing: 2px;
 }
 
-
-@media (max-width: 768px) {
-  .button-group {
-    flex-direction: column;
-  }
-  
-  .control-btn {
-    width: 100%;
-  }
-  
-  .box-info {
-    grid-template-columns: 1fr;
-  }
+.progress-bar {
+  width: 100px;
+  height: 4px;
+  background: rgba(192, 192, 192, 0.2);
+  border: 1px solid #c0c0c0;
+  position: relative;
+  overflow: hidden;
 }
+
+.progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #c0c0c0, #e0e0e0);
+  width: 60%;
+}
+
+.scan-indicators {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.indicator-dot {
+  width: 8px;
+  height: 8px;
+  background: #c0c0c0;
+  border-radius: 50%;
+}
+
+.indicator-lines {
+  width: 20px;
+  height: 2px;
+  background: repeating-linear-gradient(
+    90deg,
+    #c0c0c0 0px,
+    #c0c0c0 2px,
+    transparent 2px,
+    transparent 4px
+  );
+}
+
+.edge-rulers {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.ruler-left,
+.ruler-right {
+  position: absolute;
+  top: 0;
+  width: 20px;
+  height: 100%;
+  border: 1px solid rgba(192, 192, 192, 0.3);
+}
+
+.ruler-left {
+  left: 0;
+}
+
+.ruler-right {
+  right: 0;
+}
+
+.ruler-mark {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: rgba(192, 192, 192, 0.5);
+}
+
+.ruler-left .ruler-mark {
+  left: 15px;
+  width: 5px;
+}
+
+.ruler-right .ruler-mark {
+  right: 15px;
+  width: 5px;
+}
+
+.corner-markers {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.corner-marker {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #c0c0c0;
+}
+
+.corner-marker.top-left {
+  top: 10px;
+  left: 10px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.corner-marker.top-right {
+  top: 10px;
+  right: 10px;
+  border-left: none;
+  border-bottom: none;
+}
+
+.corner-marker.bottom-left {
+  bottom: 10px;
+  left: 10px;
+  border-right: none;
+  border-top: none;
+}
+
+.corner-marker.bottom-right {
+  bottom: 10px;
+  right: 10px;
+  border-left: none;
+  border-top: none;
+}
+
+/* 動畫效果 */
+@keyframes gridPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}
+
 </style>

@@ -31,27 +31,27 @@ onMounted(() => {
 
 body {
   font-family: 'Courier New', monospace;
-  background: #0a0a0a;
-  color: #00ff00;
+  background: #1a1a1a;
+  color: #e0e0e0;
   overflow-x: hidden;
 }
 
 .app {
   min-height: 100vh;
-  background: linear-gradient(45deg, #0a0a0a 0%, #1a1a1a 100%);
+  background: linear-gradient(45deg, #1a1a1a 0%, #2a2a2a 100%);
 }
 
 .header {
   text-align: center;
   padding: 2rem;
-  border-bottom: 2px solid #00ff00;
-  background: rgba(0, 255, 0, 0.05);
+  border-bottom: 2px solid #c0c0c0;
+  background: rgba(192, 192, 192, 0.05);
 }
 
 .header h1 {
   font-size: 2.5rem;
   margin-bottom: 0.5rem;
-  text-shadow: 0 0 10px #00ff00;
+  text-shadow: 0 0 10px #c0c0c0;
   letter-spacing: 2px;
 }
 

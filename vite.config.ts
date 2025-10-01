@@ -6,8 +6,7 @@ export default defineConfig({
   plugins: [vue()],
   base: '/cctv-style-photo-editor/',
   build: {
-    outDir: 'dist',
-    assetsDir: 'assets'
+    outDir: 'docs',
   },
   publicDir: 'public'
 })

@@ -2,6 +2,14 @@
 
 A photo editor with a sci-fi surveillance interface that allows you to upload base images and create multiple adjustable detection boxes with connection functionality. Features a black and white metallic design that simulates professional surveillance system visual effects.
 
+## Demo
+
+<div align="center">
+  <img src="/demo1.png" width="30%" alt="Demo 1" />
+  <img src="/demo2.png" width="30%" alt="Demo 2" />
+  <img src="/demo3.png" width="30%" alt="Demo 3" />
+</div>
+
 ## Features
 
 - 🖼️ **Image Upload**: Support drag & drop or click to upload base images

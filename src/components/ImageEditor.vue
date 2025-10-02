@@ -24,6 +24,8 @@
           @click="handleImageClick"
           class="base-image"
         />
+        
+        
         <div v-if="baseImage" class="remove-base-image-btn" @click="clearBaseImage">
           <img src="/cross.png" alt="Close" />
         </div>
@@ -111,7 +113,6 @@
             :y2="connection.y2"
             :class="['connection-line', { 'selected': selectedConnectionIndex === index }]"
             :stroke="connection.color || '#01FF06'"
-            @click.stop="selectConnection(index)"
           />
         </svg>
         
@@ -142,6 +143,7 @@
           <div class="corner-marker bottom-left"></div>
           <div class="corner-marker bottom-right"></div>
         </div>
+        
       </div>
     </div>
     
@@ -202,8 +204,12 @@
       </div>
     </div>
     
-    <button @click="saveImage" class="save-btn">
-      💾 SAVE
+    <button
+      v-if="baseImage"
+      @click="saveImage"
+      class="save-btn"
+    >
+      SAVE
     </button>
   </div>
 </template>
@@ -273,6 +279,7 @@ const getBoxStyle = (box: Box) => {
   }
 }
 
+
 const triggerFileUpload = () => {
   fileInput.value?.click()
 }
@@ -306,6 +313,7 @@ const handleFileUpload = (event: Event) => {
   }
 }
 
+
 const handleDrop = (event: DragEvent) => {
   event.preventDefault()
   const file = event.dataTransfer?.files[0]
@@ -338,16 +346,10 @@ const handleImageClick = (event: MouseEvent) => {
   const x = event.clientX - rect.left
   const y = event.clientY - rect.top
   
-  // 調試信息
-  console.log('Image dimensions:', {
-    naturalWidth: baseImageRef.value.naturalWidth,
-    naturalHeight: baseImageRef.value.naturalHeight,
-    offsetWidth: baseImageRef.value.offsetWidth,
-    offsetHeight: baseImageRef.value.offsetHeight,
-    clientWidth: baseImageRef.value.clientWidth,
-    clientHeight: baseImageRef.value.clientHeight,
-    rect: rect
-  })
+  // 如果正在拖拽錨點，不處理點擊事件
+  if (isDraggingAnchor.value) {
+    return
+  }
   
   // 檢查是否點擊在現有框框內
   for (const box of boxes.value) {
@@ -357,9 +359,14 @@ const handleImageClick = (event: MouseEvent) => {
   }
   
   // 檢查是否點擊在連線上
-  for (const connection of connections.value) {
-    if (isPointOnLine(x, y, connection)) {
-      return
+  for (let i = 0; i < connections.value.length; i++) {
+    const connection = connections.value[i]
+    if (connection) {
+      const isOnLine = isPointOnLine(x, y, connection)
+      if (isOnLine) {
+        selectConnection(i)
+        return
+      }
     }
   }
   
@@ -589,7 +596,7 @@ const saveImage = async () => {
             boxImg.onerror = () => {
               resolve(true) // 即使載入失敗也繼續
             }
-            boxImg.src = box.image
+            boxImg.src = box.image || ''
           })
         }
       }
@@ -599,12 +606,14 @@ const saveImage = async () => {
 
     // 繪製連線
     connections.value.forEach(connection => {
-      ctx.strokeStyle = connection.color || '#01FF06'
-      ctx.lineWidth = 2 * scaleX
-      ctx.beginPath()
-      ctx.moveTo(connection.x1 * scaleX, connection.y1 * scaleY)
-      ctx.lineTo(connection.x2 * scaleX, connection.y2 * scaleY)
-      ctx.stroke()
+      if (connection) {
+        ctx.strokeStyle = connection.color || '#01FF06'
+        ctx.lineWidth = 2 * scaleX
+        ctx.beginPath()
+        ctx.moveTo(connection.x1 * scaleX, connection.y1 * scaleY)
+        ctx.lineTo(connection.x2 * scaleX, connection.y2 * scaleY)
+        ctx.stroke()
+      }
     })
 
     // 等待一小段時間確保所有繪製完成
@@ -849,8 +858,9 @@ onUnmounted(() => {
 
 <style scoped>
 .image-editor {
-  max-width: 1200px;
+  max-width: 768px;
   margin: 0 auto;
+  position: relative;
 }
 
 .upload-section {
@@ -862,7 +872,7 @@ onUnmounted(() => {
   border-radius: 8px;
   padding: 2rem;
   text-align: center;
-  background: rgba(192, 192, 192, 0.05);
+  background: rgba(192, 192, 192, 0.2);
   cursor: pointer;
   transition: all 0.3s ease;
   min-height: 400px;
@@ -873,7 +883,7 @@ onUnmounted(() => {
 
 .upload-area:hover {
   border-color: #e0e0e0;
-  background: rgba(192, 192, 192, 0.1);
+  background: rgba(192, 192, 192, 0.3);
 }
 
 .upload-placeholder {
@@ -903,12 +913,14 @@ onUnmounted(() => {
   max-width: 100%;
 }
 
+
+
 .base-image {
   max-width: 100%;
   max-height: 70vh;
-  border-radius: 4px;
   cursor: crosshair;
   position: relative;
+  display: block;
 }
 
 .remove-base-image-btn {
@@ -969,26 +981,101 @@ onUnmounted(() => {
   word-wrap: break-word;
 }
 
-.box-control-panel,
-.connection-control-panel {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  width: 300px;
+.box-control-panel {
+  position: static;
+  width: 100%;
+  max-width: 600px;
+  margin: 20px auto;
   background: rgba(0, 0, 0, 0.9);
   border: 2px solid #c0c0c0;
   border-radius: 8px;
   padding: 0;
   z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+
+.box-control-panel .panel-content {
+  display: flex;
+  flex-direction: row;
+  gap: 20px;
+  padding: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.box-control-panel .control-group {
+  flex: 1;
+  min-width: 150px;
+  margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .box-control-panel .panel-content {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .box-control-panel .control-group {
+    min-width: 100%;
+  }
+}
+
+.connection-control-panel {
+  position: static;
+  width: 100%;
+  max-width: 600px;
+  margin: 20px auto;
+  background: rgba(0, 0, 0, 0.9);
+  border: 2px solid #c0c0c0;
+  border-radius: 8px;
+  padding: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+
+.connection-control-panel .panel-content {
+  display: flex;
+  flex-direction: row;
+  gap: 20px;
+  padding: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.connection-control-panel .control-group {
+  flex: 1;
+  min-width: 150px;
+  margin-bottom: 0;
+}
+
+.connection-control-panel .panel-header {
+  justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .connection-control-panel .panel-content {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .connection-control-panel .control-group {
+    min-width: 100%;
+  }
 }
 
 .panel-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   padding: 15px;
   border-bottom: 1px solid #c0c0c0;
   background: rgba(192, 192, 192, 0.1);
+}
+
+.box-control-panel .panel-header {
+  justify-content: center;
 }
 
 .panel-header h3 {
@@ -1036,9 +1123,9 @@ onUnmounted(() => {
 }
 
 .control-group input[type="color"] {
-  width: 100%;
-  height: 40px;
-  border: 1px solid #c0c0c0;
+  width: 60px;
+  height: 30px;
+  /* border: 1px solid #c0c0c0; */
   background: transparent;
   cursor: pointer;
 }
@@ -1103,12 +1190,10 @@ onUnmounted(() => {
 
 .save-btn:hover {
   background: linear-gradient(45deg, #e0e0e0, #c0c0c0);
-  transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(192, 192, 192, 0.4);
 }
 
 .save-btn:active {
-  transform: translateY(0);
   box-shadow: 0 2px 6px rgba(192, 192, 192, 0.3);
 }
 
@@ -1121,7 +1206,7 @@ onUnmounted(() => {
   min-width: 50px;
   min-height: 50px;
   transition: all 0.2s ease;
-  z-index: 2;
+  z-index: 10;
   background: transparent;
 }
 
@@ -1247,7 +1332,7 @@ onUnmounted(() => {
   left: 0;
   width: 100%;
   height: 100%;
-  pointer-events: auto;
+  pointer-events: none;
   z-index: 1;
 }
 

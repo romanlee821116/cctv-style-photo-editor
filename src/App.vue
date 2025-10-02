@@ -106,7 +106,7 @@ body {
 }
 
 .demo img {
-  width: auto;
+  width: 100%;
   height: 100vh;
   display: block;
 }

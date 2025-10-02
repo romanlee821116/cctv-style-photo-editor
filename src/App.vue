@@ -14,8 +14,8 @@ const isHovering = ref(false)
 const handleMouseMove = (event: MouseEvent) => {
   const rect = (event.target as HTMLImageElement).getBoundingClientRect()
   mousePosition.value = {
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top
+    x: event.clientX,
+    y: event.clientY
   }
 }
 
@@ -53,12 +53,12 @@ onMounted(() => {
       v-if="isHovering" 
       class="hover-box"
       :style="{
-        left: (mousePosition.x - 50) + 'px',
-        top: (mousePosition.y - 50) + 'px'
+        left: (mousePosition.x - 100) + 'px',
+        top: (mousePosition.y - 100) + 'px'
       }"
     />
   </div>
-  <div class="app">
+  <div class="app bitcount-prop-single-ink-app">
     <header class="header">
       <h1>CCTV STYLE IMAGE EDITOR</h1>
       <p>Upload image, click to create boxes, freely adjust size</p>
@@ -85,6 +85,24 @@ onMounted(() => {
   box-sizing: border-box;
 }
 
+.bitcount-prop-single-ink-app {
+  font-family: "Bitcount Prop Single Ink", system-ui;
+  font-optical-sizing: auto;
+  font-weight: 900;
+  font-style: normal;
+  font-variation-settings:
+    "slnt" 0,
+    "CRSV" 0.5,
+    "ELSH" 0,
+    "ELXP" 0,
+    "SZP1" 0,
+    "SZP2" 0,
+    "XPN1" 0,
+    "XPN2" 0,
+    "YPN1" 0,
+    "YPN2" 0;
+}
+
 html, body {
   font-family: 'Courier New', monospace;
   background: black;
@@ -103,6 +121,7 @@ body {
   width: 100%;
   position: relative;
   display: inline-block;
+  overflow: hidden;
 }
 
 .demo img {
@@ -168,7 +187,7 @@ body {
   display: flex;
   width: calc(100% * 4); /* 8 張圖 (4張重複) */
   height: 100%;
-  animation: scroll 20s linear infinite;
+  animation: scroll 40s linear infinite;
 }
 
   .slides img {

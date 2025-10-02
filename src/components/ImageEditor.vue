@@ -773,7 +773,7 @@ const handleMouseMove = (event: MouseEvent) => {
     
     const box = boxes.value[currentBoxIndex.value]
     if (box) {
-      box.width = Math.max(50, resizeStart.value.width + deltaX)
+      box.width = Math.max(40, resizeStart.value.width + deltaX)
       box.height = Math.max(50, resizeStart.value.height + deltaY)
       
       // 更新與該框框相關的連線
@@ -967,6 +967,7 @@ onUnmounted(() => {
 }
 
 .box-text {
+  font-family: "Arial", sans-serif;
   position: absolute;
   top: 0;
   left: 0;
@@ -977,7 +978,6 @@ onUnmounted(() => {
   text-shadow: 0 0 2px #000;
   text-align: center;
   pointer-events: none;
-  max-width: calc(100% - 10px);
   word-wrap: break-word;
 }
 
@@ -1204,7 +1204,7 @@ onUnmounted(() => {
   cursor: move;
   user-select: none;
   min-width: 50px;
-  min-height: 50px;
+  min-height: 40px;
   transition: all 0.2s ease;
   z-index: 10;
   background: transparent;
